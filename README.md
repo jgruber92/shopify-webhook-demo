@@ -11,6 +11,7 @@ Order placed in Shopify
   → Shopify sends the order (webhook) to /webhooks/orders-create
   → Server checks the HMAC signature (rejects with 401 if it doesn't match)
   → Server replies 200 so Shopify knows it arrived
+  → Server skips it if it's a duplicate (same X-Shopify-Webhook-Id as before)
   → Server sends a text through Twilio
 ```
 
@@ -41,6 +42,16 @@ You'll need Node.js, a Shopify store (a development store works), and a Twilio a
 5. In Shopify admin, go to **Settings → Notifications → Webhooks → Create webhook**. Choose **Order creation**, format **JSON**, and set the URL to `https://<your-tunnel-url>/webhooks/orders-create`.
 6. Place an order (or click **Send test**), and a text should arrive.
 
+## Demo: a duplicate webhook
+
+Shopify can deliver the same webhook more than once, for example when it retries. To show what happens, run this after an order has come through:
+
+```
+npm run replay
+```
+
+It resends the last webhook exactly as Shopify sent it: same body, same signature, same webhook ID. The server recognizes the ID, logs `Duplicate webhook, skipping`, and no second text is sent.
+
 ## Notes
 
 - **Twilio trial accounts** can only send Twilio's built-in message templates, not custom text. That's why the message body is a template name from `TWILIO_TRIAL_TEMPLATE` and the text uses Twilio's own wording. They can also only text phone numbers you've verified in the Twilio Console.
@@ -49,6 +60,6 @@ You'll need Node.js, a Shopify store (a development store works), and a Twilio a
 ## What I'd add next
 
 - **Real order details in the text** (order number, total, items), once the Twilio account is upgraded.
-- **Skipping duplicates.** Shopify can deliver the same webhook more than once; each has an `X-Shopify-Webhook-Id` that could be tracked.
+- **Remembering handled webhooks in a database.** Right now the list of handled webhook IDs lives in memory, so it resets when the server restarts.
 - **Error handling and logging** around the Twilio call.
 - **Hosting it somewhere permanent** instead of running it on a laptop through a tunnel.

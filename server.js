@@ -1,8 +1,10 @@
 // A stripped-down Postscript: when a Shopify order is placed, send an SMS through Twilio.
 // Built with help from Claude Code. Secrets are read from .env (see .env.example).
 
-// crypto checks Shopify's signature, express runs the web server, twilio sends texts.
+// crypto checks Shopify's signature, express runs the web server, twilio sends texts,
+// fs saves the last webhook to a file so replay.js can resend it.
 const crypto = require('crypto');
+const fs = require('fs');
 const express = require('express');
 const twilio = require('twilio');
 
@@ -11,6 +13,9 @@ const PORT = process.env.PORT || 3000;
 
 // Log in to Twilio with my account credentials from .env.
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+// Webhook IDs we've already handled, so a repeat delivery doesn't send a second text.
+const handledWebhookIds = new Set();
 
 // Health check: shows "ok" in a browser to confirm the server and tunnel are up.
 app.get('/', (req, res) => {
@@ -34,11 +39,23 @@ app.post('/webhooks/orders-create', express.raw({ type: 'application/json' }), a
   // Step 2: reply 200 right away. Shopify retries if it doesn't hear back within 5 seconds.
   res.sendStatus(200);
 
-  // Step 3: read the order and log its number
-  const order = JSON.parse(req.body);
-  console.log('New order:', order.name);
+  // Step 3: skip duplicates. Shopify can deliver the same webhook more than once
+  // (e.g. a retry), and every delivery of it has the same X-Shopify-Webhook-Id.
+  const webhookId = req.get('X-Shopify-Webhook-Id');
+  if (handledWebhookIds.has(webhookId)) {
+    console.log('Duplicate webhook, skipping:', webhookId);
+    return;
+  }
+  handledWebhookIds.add(webhookId);
 
-  // Step 4: text me. Twilio trial accounts only allow built-in templates, so we send
+  // Save this webhook (headers + body) so replay.js can resend it for the demo.
+  fs.writeFileSync('last-webhook.json', JSON.stringify({ headers: req.headers, body: req.body.toString() }));
+
+  // Step 4: read the order and log its number
+  const order = JSON.parse(req.body);
+  console.log('New order:', order.name, '| webhook ID:', webhookId);
+
+  // Step 5: text me. Twilio trial accounts only allow built-in templates, so we send
   // the template name from .env (e.g. sms_order_confirmation) instead of custom text.
   await client.messages.create({
     from: process.env.TWILIO_FROM_NUMBER,

@@ -4,7 +4,8 @@
   "description": "Send an SMS through Twilio when a Shopify order is created",
   "main": "server.js",
   "scripts": {
-    "start": "node --env-file-if-exists=.env server.js"
+    "start": "node --env-file-if-exists=.env server.js",
+    "replay": "node replay.js"
   },
   "dependencies": {
     "express": "^5.1.0",
