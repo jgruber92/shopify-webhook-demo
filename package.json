@@ -1,0 +1,13 @@
+{
+  "name": "shopify-webhook-demo",
+  "version": "1.0.0",
+  "description": "Send an SMS through Twilio when a Shopify order is created",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "twilio": "^6.1.1"
+  }
+}
